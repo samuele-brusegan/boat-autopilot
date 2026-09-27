@@ -39,7 +39,7 @@ class RoutePlannerTest {
     }
 
     @Test
-    void keepsSixteenBlocksOffShoreWhenThereIsRoom() {
+    void keepsCoastalClearanceWhileAllowingOneBlockStraighteningTolerance() {
         int width = 64;
         int[] pixels = fill(width * width, WATER);
         for (int z = 0; z < 16; z++) {
@@ -54,7 +54,7 @@ class RoutePlannerTest {
             .filter(pos -> pos.getX() >= 16 && pos.getX() <= 47)
             .toList();
         assertFalse(middleOfRoute.isEmpty());
-        assertTrue(middleOfRoute.stream().allMatch(pos -> pos.getZ() >= 31));
+        assertTrue(middleOfRoute.stream().allMatch(pos -> pos.getZ() >= 30), middleOfRoute::toString);
     }
 
     @Test
@@ -70,6 +70,23 @@ class RoutePlannerTest {
 
         assertEquals(RoutePlan.Status.READY, plan.status());
         assertEquals(27.0, xAtZ(new BlockPos(23, 0, 8), plan.path(), 32), 1.0);
+    }
+
+    @Test
+    void smoothsSmallShorelineDetoursIntoAStraightCourse() {
+        int width = 128;
+        int[] pixels = fill(width * width, WATER);
+        for (int z = 0; z < width; z++) {
+            for (int x = 0; x <= 23; x++) pixels[z * width + x] = LAND;
+        }
+        for (int z = 60; z <= 64; z++) pixels[z * width + 24] = LAND;
+        MapRaster map = raster(width, width, pixels);
+
+        RoutePlan plan = planner.plan(map, new BlockPos(40, 0, 20), new BlockPos(40, 0, 105));
+
+        assertEquals(RoutePlan.Status.READY, plan.status());
+        assertEquals(1, plan.path().size());
+        assertEquals(105, plan.path().getFirst().getZ());
     }
 
     @Test

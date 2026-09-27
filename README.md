@@ -22,7 +22,8 @@ JourneyMap's client map images and does not require a server-side installation.
 The player must be aboard a vanilla boat, raft, or chest boat. The route planner uses
 JourneyMap's Day map image to classify water, land, and uncertain pixels, then
 searches connected water. It adds a clearance cost near shores, aiming to keep at
-least 16 blocks away when the mapped water allows it. In narrow straits the same
+least 16 blocks away when the mapped water allows it; path smoothing may trade up
+to one block of clearance for a straighter course. In narrow straits the same
 cost favors the route with the most water on both sides. A destination on land
 snaps to reachable water within 64 blocks. The classifier can be inaccurate on
 custom themes, resource packs, terrain overlays, or unlabeled areas; uncertain

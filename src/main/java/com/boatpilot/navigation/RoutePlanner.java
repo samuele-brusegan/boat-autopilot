@@ -24,6 +24,7 @@ public final class RoutePlanner {
     private static final int CLEARANCE_BLOCKS = 16;
     private static final int CLEARANCE_SCORE_PER_BLOCK = 3;
     private static final int CLEARANCE_LIMIT = CLEARANCE_BLOCKS * CLEARANCE_SCORE_PER_BLOCK;
+    private static final int STRAIGHTENING_CLEARANCE_TOLERANCE = CLEARANCE_SCORE_PER_BLOCK;
 
     public RoutePlan plan(MapRaster map, BlockPos start, BlockPos destination) {
         int sx = map.pixelX(start.getX());
@@ -179,7 +180,7 @@ public final class RoutePlanner {
 
     private static int clearancePenalty(int clearanceScore) {
         int deficit = Math.max(0, CLEARANCE_LIMIT - clearanceScore);
-        return deficit * deficit / 2;
+        return deficit * 8;
     }
 
     /** Selects the closest water cell to a land destination within the boat's reachable water patch. */
@@ -259,7 +260,7 @@ public final class RoutePlanner {
         return smoothed;
     }
 
-    /** Bresenham shortcut test; it cannot cut land or be less coast-safe than the searched segment. */
+    /** Bresenham shortcut test; it cannot cut land and preserves useful coast clearance. */
     private static boolean lineIsNoWorse(MapRaster map, byte[] clearance, List<BlockPos> path,
                                          int anchor, int candidate) {
         BlockPos from = path.get(anchor);
@@ -269,16 +270,13 @@ public final class RoutePlanner {
         int endX = map.pixelX(to.getX());
         int endZ = map.pixelZ(to.getZ());
         if (x < 0 || z < 0 || endX < 0 || endZ < 0) return false;
-        long originalCost = 0;
+        List<Integer> originalClearance = new ArrayList<>();
         for (int i = anchor + 1; i <= candidate; i++) {
-            int prevX = map.pixelX(path.get(i - 1).getX());
-            int prevZ = map.pixelZ(path.get(i - 1).getZ());
             int pathX = map.pixelX(path.get(i).getX());
             int pathZ = map.pixelZ(path.get(i).getZ());
-            originalCost += prevX != pathX && prevZ != pathZ ? DIAGONAL_COST : BLOCK_COST;
-            originalCost += clearancePenalty(clearance[pathZ * map.width() + pathX] & 0xff);
+            originalClearance.add(clearance[pathZ * map.width() + pathX] & 0xff);
         }
-        long shortcutCost = 0;
+        List<Integer> shortcutClearance = new ArrayList<>();
         int deltaX = Math.abs(endX - x);
         int deltaZ = Math.abs(endZ - z);
         int stepX = Integer.compare(endX, x);
@@ -301,10 +299,22 @@ public final class RoutePlanner {
                 && (map.surface(x, oldZ) != SurfaceType.WATER
                 || map.surface(oldX, z) != SurfaceType.WATER)) return false;
             if (map.surface(x, z) != SurfaceType.WATER) return false;
-            shortcutCost += x != oldX && z != oldZ ? DIAGONAL_COST : BLOCK_COST;
-            shortcutCost += clearancePenalty(clearance[z * map.width() + x] & 0xff);
+            shortcutClearance.add(clearance[z * map.width() + x] & 0xff);
         }
-        return shortcutCost <= originalCost;
+        if (shortcutClearance.isEmpty() || originalClearance.isEmpty()) return true;
+        for (int i = 0; i < shortcutClearance.size(); i++) {
+            int originalIndex = shortcutClearance.size() == 1
+                ? originalClearance.size() - 1
+                : (int) Math.round(i * (originalClearance.size() - 1.0) / (shortcutClearance.size() - 1.0));
+            int originalScore = originalClearance.get(originalIndex);
+            int shortcutScore = shortcutClearance.get(i);
+            if (originalScore >= CLEARANCE_LIMIT) {
+                if (shortcutScore + STRAIGHTENING_CLEARANCE_TOLERANCE < CLEARANCE_LIMIT) return false;
+            } else if (shortcutScore + STRAIGHTENING_CLEARANCE_TOLERANCE < originalScore) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static SearchNode searchNode(int index, int cost, int x, int z, int targetX, int targetZ,
