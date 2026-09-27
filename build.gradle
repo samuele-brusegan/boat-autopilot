@@ -1,0 +1,53 @@
+plugins {
+    id 'java'
+    id 'idea'
+    id 'eclipse'
+    id 'net.minecraftforge.gradle' version '[7.0.17,8)'
+}
+
+group = providers.gradleProperty('mod_group').get()
+version = providers.gradleProperty('mod_version').get()
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(25)
+sourceSets.main.resources { srcDir 'src/generated/resources' }
+
+minecraft {
+    runs {
+        configureEach {
+            workingDir = layout.projectDirectory.dir('run')
+            systemProperty 'eventbus.api.strictRuntimeChecks', 'true'
+        }
+        register('client')
+        register('server') { args '--nogui' }
+        register('gameTestServer')
+    }
+}
+
+repositories {
+    minecraft.mavenizer(it)
+    maven fg.forgeMaven
+    maven fg.minecraftLibsMaven
+    maven {
+        name = 'JourneyMap Maven'
+        url = 'https://maven.blamejared.com'
+    }
+    mavenCentral()
+}
+
+dependencies {
+    implementation minecraft.dependency("net.minecraftforge:forge:${providers.gradleProperty('minecraft_version').get()}-${providers.gradleProperty('forge_version').get()}")
+    compileOnly "info.journeymap:journeymap-api-forge:${providers.gradleProperty('journeymap_api_version').get()}"
+    annotationProcessor 'net.minecraftforge:eventbus-validator:7.0.6'
+
+    testImplementation platform('org.junit:junit-bom:5.11.4')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+tasks.withType(Test).configureEach {
+    useJUnitPlatform()
+}

@@ -1,0 +1,7 @@
+{
+  "pack": {
+    "description": "Boat Autopilot resources",
+    "min_format": [97, 0],
+    "max_format": [97, 0]
+  }
+}
